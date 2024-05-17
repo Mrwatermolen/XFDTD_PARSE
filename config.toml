@@ -1,0 +1,78 @@
+# XFDTD Simulation Example: Dielectric Sphere Scattering
+
+[basic]
+dx = 0.001
+dy = 0.001
+dz = 0.001
+cfl = 0.9
+time_steps = 1000
+
+[basic.thread_config]
+x = 1
+y = 1
+z = 1
+
+[[shape.cube]]
+name = "domain_shape"
+start = [-0.175, -0.175, -0.175]
+size = [0.35, 0.35, 0.35]
+
+[[shape.cube]]
+name = "monitor_shape"
+start = [-0.175, 0, -0.175]
+size = [0.35, 0.001, 0.35]
+
+[[shape.sphere]]
+name = "dielectric_sphere_shape"
+center = [0.0, 0.0, 0.0]
+radius = 0.1
+
+[[material]]
+name = "air"
+relative_permittivity = 1.0
+relative_permeability = 1.0
+conductivity = 0.0
+
+[[material]]
+name = "dielectric_sphere_material"
+relative_permittivity = 4.0
+relative_permeability = 1.0
+conductivity = 0.0
+
+[[waveform.gaussian]]
+name = "gaussian_pulse"
+auto = true
+
+[[excitation.tfsf]]
+name = "incident_wave_source"
+distance_index = 15
+psi = 0.0
+theta = 0.0
+phi = 0.0
+waveform = "gaussian_pulse"
+
+[[monitor.field]]
+name = "Ex_xz"
+field_type = "EX"
+shape = "monitor_shape"
+
+[[monitor.movie]]
+name = "Ex_xz_movie"
+frame_monitor = "Ex_xz"
+frame_interval = 10
+output_dir = "./data/dielectric_sphere_scatter/movie_ex_xz"
+
+[[object]]
+name = "domain"
+material = "air"
+shape = "domain_shape"
+priority = 0
+
+[[object]]
+name = "dielectric_sphere"
+material = "dielectric_sphere_material"
+shape = "dielectric_sphere_shape"
+priority = 1
+
+[[boundary.pml]]
+thickness_index = 8
