@@ -4,6 +4,29 @@
 #include <iostream>
 #include <toml++/toml.hpp>
 
+#include "xfdtd_parse/material_map.h"
+
+auto readShape(const auto &table) {
+  auto shape_map = xfdtd::parse::ShapeMap();
+  shape_map.read(*table);
+
+  return shape_map;
+}
+
+auto readMaterial(const auto &table) {
+  auto material_map = xfdtd::parse::MaterialMap();
+  material_map.read(*table);
+
+  return material_map;
+}
+
+auto printMap(const auto &map) {
+  for (const auto &[key, value] : map.map()) {
+    std::cout << key << "\n";
+    std::cout << value->toString() << "\n";
+  }
+}
+
 int main(int argc, char **argv) {
   using namespace std::string_view_literals;
 
@@ -20,14 +43,15 @@ int main(int argc, char **argv) {
 
     auto table = data.as_table();
 
-    auto shape_map = xfdtd::parse::ShapeMap();
-    shape_map.read(*table);
-
+    auto shape_map = readShape(table);
     std::cout << "Shapes:\n";
-    for (const auto &[key, value] : shape_map._shapes) {
-      std::cout << key << "\n";
-      std::cout << value->toString() << "\n";
-    }
+    printMap(shape_map);
+    std::cout << "\n";
+
+    auto material_map = readMaterial(table);
+    std::cout << "Materials:\n";
+    printMap(material_map);
+    std::cout << "\n";
 
   } catch (const std::exception &e) {
     std::cerr << "Error reading file: " << file << "\n";

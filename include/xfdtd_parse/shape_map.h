@@ -38,7 +38,10 @@ class ShapeMap {
 
   auto read(const toml::table& table) -> void;
 
-  std::unordered_map<std::string, std::unique_ptr<Shape>> _shapes;
+  auto map() const
+      -> const std::unordered_map<std::string, std::unique_ptr<Shape>>& {
+    return _shapes;
+  }
 
  private:
   template <ShapeType S>
@@ -58,6 +61,8 @@ class ShapeMap {
 
   auto makeSphere(const toml::table& table) const
       -> std::tuple<std::string, std::unique_ptr<Shape>>;
+
+  std::unordered_map<std::string, std::unique_ptr<Shape>> _shapes;
 };
 
 inline constexpr auto ShapeMap::shapeTypeToKey(ShapeType type) -> std::string {
@@ -74,7 +79,8 @@ inline constexpr auto ShapeMap::shapeTypeToKey(ShapeType type) -> std::string {
 template <ShapeMap::ShapeType S>
 auto ShapeMap::readShape(const toml::table& table) -> void {
   if constexpr (S == ShapeType::Cylinder) {
-    throw XFDTDParseShapeMapException("ShapeMap::readShape: Not implemented Cylinder");
+    throw XFDTDParseShapeMapException(
+        "ShapeMap::readShape: Not implemented Cylinder");
   }
 
   constexpr auto key = shapeTypeToKey(S);
