@@ -24,8 +24,8 @@ auto MaterialMap::readMaterial(const toml::table& table) -> void {
     }
 
     try {
-      auto [name, material_ptr] = makeMaterial(*material_table);
-      addMaterial(name, std::move(material_ptr));
+      auto [name, material_ptr] = makeMaterialEntry(*material_table);
+      addMaterialEntry(name, std::move(material_ptr));
     } catch (const XFDTDParseMaterialMapException& e) {
       std::stringstream ss;
       ss << "Warning: occurred exception in readMaterial: " << e.what()
@@ -35,23 +35,24 @@ auto MaterialMap::readMaterial(const toml::table& table) -> void {
   }
 }
 
-auto MaterialMap::makeMaterial(const toml::table& table) const
-    -> std::tuple<std::string, std::unique_ptr<Material>> {
+auto MaterialMap::makeMaterialEntry(const toml::table& table) const
+    -> std::tuple<std::string, std::unique_ptr<MaterialEntry>> {
   auto is_dispersive = table["dispersive"].value<bool>();
   if (!is_dispersive.has_value() || !is_dispersive.value()) {
-    return makeCommon(table);
+    return makeCommonEntry(table);
   }
 
-  return makeLinearDispersion(table);
+  throw XFDTDParseMaterialMapException(
+      "MaterialMap::makeMaterialEntry: Not implemented");
 }
 
-auto MaterialMap::addMaterial(const std::string& name,
-                              std::unique_ptr<Material> material) -> void {
+auto MaterialMap::addMaterialEntry(
+    const std::string& name, std::unique_ptr<MaterialEntry> material) -> void {
   _materials[name] = std::move(material);
 }
 
-auto MaterialMap::makeCommon(const toml::table& table) const
-    -> std::tuple<std::string, std::unique_ptr<Material>> {
+auto MaterialMap::makeCommonEntry(const toml::table& table) const
+    -> std::tuple<std::string, std::unique_ptr<MaterialEntry>> {
   auto name = table["name"].value<std::string>();
   if (!name) {
     std::stringstream ss;
@@ -95,17 +96,10 @@ auto MaterialMap::makeCommon(const toml::table& table) const
     sigma_m = 0.0;
   }
 
-  return std::make_tuple(
-      name.value(), std::make_unique<Material>(
-                        name.value(), ElectroMagneticProperty{
-                                          epsilon_r.value(), mu_r.value(),
-                                          sigma_e.value(), sigma_m.value()}));
-}
-
-auto MaterialMap::makeLinearDispersion(const toml::table& table) const
-    -> std::tuple<std::string, std::unique_ptr<LinearDispersiveMaterial>> {
-  throw XFDTDParseMaterialMapException(
-      "MaterialMap::makeLinearDispersion: Not implemented");
+  return std::make_tuple(name.value(),
+                         std::make_unique<MaterialEntry>(
+                             name.value(), epsilon_r.value(), mu_r.value(),
+                             sigma_e.value(), sigma_m.value()));
 }
 
 }  // namespace parse

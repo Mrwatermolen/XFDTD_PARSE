@@ -1,7 +1,9 @@
 #ifndef __XFDTD_PARSE_SHAPE_MAP_H__
 #define __XFDTD_PARSE_SHAPE_MAP_H__
 
+#include <xfdtd/coordinate_system/coordinate_system.h>
 #include <xfdtd/shape/shape.h>
+#include <xfdtd_parse/exception.h>
 
 #include <iostream>
 #include <memory>
@@ -11,11 +13,100 @@
 #include <tuple>
 #include <unordered_map>
 
-#include "xfdtd_parse/exception.h"
-
 namespace xfdtd {
 
+// forward declaration
+class Shape;
+
 namespace parse {
+
+class ShapeEntry {
+ public:
+  ShapeEntry(const std::string& name) : _name{name} {}
+
+  ShapeEntry(const ShapeEntry& other) = default;
+
+  ShapeEntry(ShapeEntry&& other) noexcept = default;
+
+  ShapeEntry& operator=(const ShapeEntry& other) = default;
+
+  ShapeEntry& operator=(ShapeEntry&& other) noexcept = default;
+
+  virtual ~ShapeEntry() = default;
+
+  auto name() const -> const std::string& { return _name; }
+
+  virtual auto toString() const -> std::string = 0;
+
+  virtual auto make() const -> std::unique_ptr<Shape> = 0;
+
+ private:
+  std::string _name{};
+};
+
+class CubeEntry : public ShapeEntry {
+ public:
+  CubeEntry(const std::string& name, const Vector& origin, const Vector& size);
+
+  CubeEntry(const CubeEntry& other) = default;
+
+  CubeEntry(CubeEntry&& other) noexcept = default;
+
+  CubeEntry& operator=(const CubeEntry& other) = default;
+
+  CubeEntry& operator=(CubeEntry&& other) noexcept = default;
+
+  virtual ~CubeEntry() = default;
+
+  auto origin() const -> const Vector& { return _origin; }
+
+  auto size() const -> const Vector& { return _size; }
+
+  auto toString() const -> std::string override {
+    std::stringstream ss;
+    ss << "CubeEntry: {name: " << name() << ", origin: " << _origin.toString()
+       << ", size: " << _size.toString() << "}";
+    return ss.str();
+  }
+
+  auto make() const -> std::unique_ptr<Shape> override;
+
+ private:
+  Vector _origin{};
+  Vector _size{};
+};
+
+class SphereEntry : public ShapeEntry {
+ public:
+  SphereEntry(const std::string& name, const Vector& center, Real radius);
+
+  SphereEntry(const SphereEntry& other) = default;
+
+  SphereEntry(SphereEntry&& other) noexcept = default;
+
+  SphereEntry& operator=(const SphereEntry& other) = default;
+
+  SphereEntry& operator=(SphereEntry&& other) noexcept = default;
+
+  virtual ~SphereEntry() = default;
+
+  auto center() const -> const Vector& { return _center; }
+
+  auto radius() const -> Real { return _radius; }
+
+  auto toString() const -> std::string override {
+    std::stringstream ss;
+    ss << "SphereEntry: {name: " << name() << ", center: " << _center.toString()
+       << ", radius: " << _radius << "}";
+    return ss.str();
+  }
+
+  auto make() const -> std::unique_ptr<Shape> override;
+
+ private:
+  Vector _center{};
+  Real _radius{};
+};
 
 class XFDTDParseShapeMapException : public XFDTDParseException {
  public:
@@ -33,36 +124,36 @@ class ShapeMap {
 
   static constexpr auto shapeTypeToKey(ShapeType type) -> std::string;
 
+  using Record = std::unordered_map<std::string, std::unique_ptr<ShapeEntry>>;
+
  public:
-  ShapeMap();
+  ShapeMap() = default;
 
   auto read(const toml::table& table) -> void;
 
-  auto map() const
-      -> const std::unordered_map<std::string, std::unique_ptr<Shape>>& {
-    return _shapes;
-  }
+  auto map() const -> const Record& { return _shapes; }
 
  private:
   template <ShapeType S>
   auto readShape(const toml::table& table) -> void;
 
   template <ShapeType S>
-  auto makeShape(const toml::table& table) const
-      -> std::tuple<std::string, std::unique_ptr<Shape>>;
+  auto makeShapeEntry(const toml::table& table) const
+      -> std::tuple<std::string, std::unique_ptr<ShapeEntry>>;
 
-  auto addShape(const std::string& name, std::unique_ptr<Shape> shape) -> void;
+  auto addShapeEntry(const std::string& name,
+                     std::unique_ptr<ShapeEntry> shape) -> void;
 
-  auto makeCube(const toml::table& table) const
-      -> std::tuple<std::string, std::unique_ptr<Shape>>;
+  auto makeCubeEntry(const toml::table& table) const
+      -> std::tuple<std::string, std::unique_ptr<CubeEntry>>;
 
-  auto makeCylinder(const toml::table& table) const
-      -> std::tuple<std::string, std::unique_ptr<Shape>>;
+  auto makeCylinderEntry(const toml::table& table) const
+      -> std::tuple<std::string, std::unique_ptr<ShapeEntry>>;
 
-  auto makeSphere(const toml::table& table) const
-      -> std::tuple<std::string, std::unique_ptr<Shape>>;
+  auto makeSphereEntry(const toml::table& table) const
+      -> std::tuple<std::string, std::unique_ptr<SphereEntry>>;
 
-  std::unordered_map<std::string, std::unique_ptr<Shape>> _shapes;
+  Record _shapes;
 };
 
 inline constexpr auto ShapeMap::shapeTypeToKey(ShapeType type) -> std::string {
@@ -100,8 +191,8 @@ auto ShapeMap::readShape(const toml::table& table) -> void {
     }
 
     try {
-      auto [name, shape] = makeShape<S>(*t.as_table());
-      addShape(name, std::move(shape));
+      auto [name, shape] = makeShapeEntry<S>(*t.as_table());
+      addShapeEntry(name, std::move(shape));
     } catch (const XFDTDParseShapeMapException& e) {
       std::stringstream ss;
       ss << "Waring: occurred exception in readShape: " << e.what()
@@ -112,15 +203,15 @@ auto ShapeMap::readShape(const toml::table& table) -> void {
 }
 
 template <ShapeMap::ShapeType S>
-auto ShapeMap::makeShape(const toml::table& table) const
-    -> std::tuple<std::string, std::unique_ptr<Shape>> {
+auto ShapeMap::makeShapeEntry(const toml::table& table) const
+    -> std::tuple<std::string, std::unique_ptr<ShapeEntry>> {
   switch (S) {
     case ShapeType::Cube:
-      return makeCube(table);
+      return makeCubeEntry(table);
     case ShapeType::Cylinder:
-      return makeCylinder(table);
+      return makeCylinderEntry(table);
     case ShapeType::Sphere:
-      return makeSphere(table);
+      return makeSphereEntry(table);
   }
 }
 

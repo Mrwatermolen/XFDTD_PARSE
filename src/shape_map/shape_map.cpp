@@ -11,7 +11,21 @@
 
 namespace xfdtd::parse {
 
-ShapeMap::ShapeMap() = default;
+CubeEntry::CubeEntry(const std::string& name, const Vector& origin,
+                     const Vector& size)
+    : ShapeEntry{name}, _origin{origin}, _size{size} {}
+
+auto CubeEntry::make() const -> std::unique_ptr<Shape> {
+  return std::make_unique<Cube>(_origin, _size);
+}
+
+SphereEntry::SphereEntry(const std::string& name, const Vector& center,
+                         Real radius)
+    : ShapeEntry{name}, _center{center}, _radius{radius} {}
+
+auto SphereEntry::make() const -> std::unique_ptr<Shape> {
+  return std::make_unique<Sphere>(_center, _radius);
+}
 
 auto ShapeMap::read(const toml::table& table) -> void {
   auto shape_table = table.get_as<toml::table>("shape");
@@ -20,13 +34,13 @@ auto ShapeMap::read(const toml::table& table) -> void {
   // readShape<ShapeType::Cylinder>(*shape_table);
 }
 
-auto ShapeMap::addShape(const std::string& name,
-                        std::unique_ptr<Shape> shape) -> void {
+auto ShapeMap::addShapeEntry(const std::string& name,
+                             std::unique_ptr<ShapeEntry> shape) -> void {
   _shapes[name] = std::move(shape);
 }
 
-auto ShapeMap::makeCube(const toml::table& table) const
-    -> std::tuple<std::string, std::unique_ptr<Shape>> {
+auto ShapeMap::makeCubeEntry(const toml::table& table) const
+    -> std::tuple<std::string, std::unique_ptr<CubeEntry>> {
   auto name = table["name"].value<std::string>();
   if (!name) {
     std::stringstream ss;
@@ -51,12 +65,12 @@ auto ShapeMap::makeCube(const toml::table& table) const
   auto start_vec = tomlArrayToVec3(*start);
   auto size_vec = tomlArrayToVec3(*size);
 
-  return std::make_tuple(name.value(),
-                         std::make_unique<Cube>(start_vec, size_vec));
+  return std::make_tuple(name.value(), std::make_unique<CubeEntry>(
+                                           name.value(), start_vec, size_vec));
 }
 
-auto ShapeMap::makeSphere(const toml::table& table) const
-    -> std::tuple<std::string, std::unique_ptr<Shape>> {
+auto ShapeMap::makeSphereEntry(const toml::table& table) const
+    -> std::tuple<std::string, std::unique_ptr<SphereEntry>> {
   auto name = table["name"].value<std::string>();
   if (!name) {
     std::stringstream ss;
@@ -80,11 +94,13 @@ auto ShapeMap::makeSphere(const toml::table& table) const
 
   auto center_vec = tomlArrayToVec3(*center);
 
-  return std::make_tuple(name.value(), std::make_unique<Sphere>(center_vec, 1));
+  return std::make_tuple(
+      name.value(),
+      std::make_unique<SphereEntry>(name.value(), center_vec, radius.value()));
 }
 
-auto ShapeMap::makeCylinder(const toml::table& table) const
-    -> std::tuple<std::string, std::unique_ptr<Shape>> {
+auto ShapeMap::makeCylinderEntry(const toml::table& table) const
+    -> std::tuple<std::string, std::unique_ptr<ShapeEntry>> {
   throw XFDTDParseShapeMapException(
       "ShapeMap::makeCylinder: Not implemented Cylinder");
 }
